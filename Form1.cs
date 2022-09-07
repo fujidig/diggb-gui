@@ -14,7 +14,7 @@ namespace diggb_gui
         {
             InitializeComponent();
             frame_buffer = new byte[WIDTH * HEIGHT * 4];
-            FileStream fs = new FileStream("cpu_instrs.gb", FileMode.Open, FileAccess.Read);
+            FileStream fs = new FileStream("red.gb", FileMode.Open, FileAccess.Read);
             int fileSize = (int)fs.Length;
             byte[] buf = new byte[fileSize];
             fs.Read(buf, 0, fileSize);
@@ -47,6 +47,40 @@ namespace diggb_gui
             bitmap.UnlockBits(data);
             pictureBox1.Image = bitmap;
 
+        }
+
+        Nullable<Key> translate_keycode(Keys key)
+        {
+            switch (key)
+            {
+                case Keys.Down: return Key.Down;
+                case Keys.Up: return Key.Up;
+                case Keys.Left: return Key.Left;
+                case Keys.Right: return Key.Right;
+                case Keys.Return: return Key.Start;
+                case Keys.RShiftKey: return Key.Select;
+                case Keys.X: return Key.A;
+                case Keys.Z: return Key.B;
+                default: return null;
+            }
+        }
+
+        private void Form1_KeyDown(object sender, KeyEventArgs e)
+        {
+            Nullable<Key> key = translate_keycode(e.KeyCode);
+            if (key != null)
+            {
+                intp.joypad.keydown((Key)key);
+            }
+        }
+
+        private void Form1_KeyUp(object sender, KeyEventArgs e)
+        {
+            Nullable<Key> key = translate_keycode(e.KeyCode);
+            if (key != null)
+            {
+                intp.joypad.keyup((Key)key);
+            }
         }
     }
 }

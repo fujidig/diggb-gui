@@ -305,7 +305,59 @@ namespace diggb_gui
 
         void render_sprites()
         {
-            // todo
+            int n_sprites = 0;
+            int height = (lcdc & 4) > 0 ? 16 : 8;
+            for (int i = 0; i < 40; i++)
+            {
+                int entry_addr = i << 2;
+                byte sprite_y = oam[entry_addr];
+                byte sprite_x = oam[entry_addr + 1];
+                byte flags = oam[entry_addr + 3];
+                bool obj_prio = (flags & 0x80) > 0;
+                bool flip_y = (flags & 0x40) > 0;
+                bool flip_x = (flags & 0x20) > 0;
+                byte palette = (flags & 0x10) > 0 ? obp1 : obp0;
+                if (sprite_y <= ly + 16 - height || sprite_y > ly + 16)
+                {
+                    continue;
+                }
+                n_sprites++;
+                if (n_sprites > 10) break;
+                if (sprite_x == 0 || sprite_x > SCREEN_W + 8 - 1)
+                {
+                    continue;
+                }
+                byte tile_no;
+                if ((lcdc & 4) > 0)
+                {
+                    if ((ly + 8 < sprite_y) ^ flip_y)
+                    {
+                        tile_no = (byte)(oam[entry_addr + 2] & 0xfe);
+                    }
+                    else
+                    {
+                        tile_no = (byte)(oam[entry_addr + 2] | 1);
+                    }
+                }
+                else
+                {
+                    tile_no = oam[entry_addr + 2];
+                }
+                byte offset_y = flip_y ? (byte)((7 - ly + 16 - sprite_y) & 7) : (byte)((ly + 16 - sprite_y) & 7);
+                (byte, byte) tile = fetch_tile(tile_no, offset_y, true);
+                for (int offset_x = 0; offset_x < 8; offset_x++)
+                {
+                    if (offset_x + sprite_x < 8) continue;
+                    int x = offset_x + sprite_x - 8;
+                    if (x >= SCREEN_W) break;
+                    byte bitpos = flip_x ? (byte)offset_x : (byte)(7 - offset_x);
+                    byte color_no = get_color_no(tile, bitpos);
+                    if (color_no == 0) continue;
+                    if (bg_prio[x] == BGPriority.Color123 && obj_prio) continue;
+                    byte color = map_color(color_no, palette);
+                    scanline[x] = color;
+                }
+            }
         }
 
         byte map_color(byte color_no, byte palette)

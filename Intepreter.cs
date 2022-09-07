@@ -21,6 +21,7 @@ namespace diggb_gui
         byte int_flag;
         byte int_enable;
         public PPU ppu;
+        public Joypad joypad;
 
         static string[] REGNAME = { "B", "C", "D", "E", "H", "L", "(HL)", "A" };
         static string[] REGNAME2 = { "BC", "DE", "HL", "AF", "SP" };
@@ -38,6 +39,7 @@ namespace diggb_gui
             ram = new byte[0x2000];
             hram = new byte[0x7f];
             ppu = new PPU();
+            joypad = new Joypad();
         }
 
         public void Run()
@@ -79,8 +81,8 @@ namespace diggb_gui
         void update(byte tick)
         {
             //Console.WriteLine("update: {0:d5} {1:x4}", (ushort)(timer.counter + tick), pc);
-            timer.update(tick);
             ppu.update(tick);
+            timer.update(tick);
 
             if (ppu.irq_vblank) {
                 int_flag |= 0x1;
@@ -96,6 +98,11 @@ namespace diggb_gui
             {
                 int_flag |= 0x4;
                 timer.irq = false;
+            }
+            if (joypad.irq)
+            {
+                int_flag |= 0x10;
+                joypad.irq = false;
             }
         }
 
@@ -1329,10 +1336,10 @@ namespace diggb_gui
             return ((af >> 4) & 1) == 1;
         }
 
-        byte read(ushort addr)
+        byte read_mmu(ushort addr)
         {
             byte res;
-            if (addr <= 0x7fff)
+            if (addr <= 0x7fff || (0xa000 <= addr && addr <= 0xbfff))
             {
                 res = cartridge.read(addr);
             }
@@ -1363,18 +1370,22 @@ namespace diggb_gui
             {
                 res = int_enable;
             }
+            else if (addr == 0xff00)
+            {
+                res = joypad.read(addr);
+            }
             else
             {
-                res = 0;
+                res = 0xff;
             }
-            tick += 4;
             return res;
+
         }
 
-        void write(ushort addr, byte val)
+        void write_mmu(ushort addr, byte val)
         {
             //debugPrint(String.Format("({0:x}) <- {1:x}", addr, val));
-            if (addr <= 0x7fff)
+            if (addr <= 0x7fff || (0xa000 <= addr && addr <= 0xbfff))
             {
                 cartridge.write(addr, val);
             }
@@ -1414,10 +1425,26 @@ namespace diggb_gui
             {
                 int_enable = val;
             }
+            else if (addr == 0xff00)
+            {
+                joypad.write(addr, val);
+            }
             else if (0xff00 <= addr && addr < 0xff80)
             {
                 // do nothing
             }
+        }
+
+        byte read(ushort addr)
+        {
+            byte res = read_mmu(addr);
+            tick += 4;
+            return res;
+        }
+
+        void write(ushort addr, byte val)
+        {
+            write_mmu(addr, val);
             tick += 4;
         }
 
@@ -1433,8 +1460,8 @@ namespace diggb_gui
 
             for (int i = 0; i < 0xa0; i ++)
             {
-                byte tmp = read((ushort)(src_base | i));
-                write((ushort)(dst_base | i), tmp);
+                byte tmp = read_mmu((ushort)(src_base | i));
+                write_mmu((ushort)(dst_base | i), tmp);
             }
         }
 
